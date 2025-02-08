@@ -1,5 +1,10 @@
 # airflow_study
 
-- AIP 분석
+https://selfserve.apache.org/jira-account.html
+- Kafka의 경우 여기서 가입하고 살펴볼 수 있는데, airflow는 없음
+<img width="1135" alt="image" src="https://github.com/user-attachments/assets/88c6adb2-1f76-4f54-ad42-3b639a3665ea" />
 
+
+
+- AIP 분석
 https://cwiki.apache.org/confluence/display/AIRFLOW/AIP-83+Rename+execution_date+-%3E+logical_date+and+remove+unique+constraint
