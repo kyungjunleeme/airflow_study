@@ -8,3 +8,6 @@ https://selfserve.apache.org/jira-account.html
 
 - AIP 분석
 https://cwiki.apache.org/confluence/display/AIRFLOW/AIP-83+Rename+execution_date+-%3E+logical_date+and+remove+unique+constraint
+
+- EDA
+https://www.youtube.com/watch?v=bk9NStntfi0
