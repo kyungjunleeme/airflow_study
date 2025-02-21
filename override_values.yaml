@@ -406,7 +406,20 @@ data:
   brokerUrlSecretName: ~
 
   # Otherwise pass connection values in
+  # 경준 추가(25.02.18)
   metadataConnection:
+#    user: airflow_user
+#    pass: airflow_pass1234
+#    protocol: postgresql
+#    host: "{{ .Values.postgresHost }}"  # Helm 설치 시 환경 변수로 설정 가능
+#    # helm upgrade --install airflow apache-airflow/airflow -n airflow --set postgresHost=host.docker.internal
+#    # postgresHost=172.20.0.1
+#    # 확인 필요  # 1)kind + local(postgres) 2) cluster 내 자원 <db-servicename>.<namespace>.svc.cluster.local
+#    port: 5432
+#    db: airflow_db
+#    sslmode: disable
+  # resultBackendConnection defaults to the same database as metadataConnection
+#  metadataConnection:
     user: postgres
     pass: postgres
     protocol: postgresql
@@ -414,7 +427,6 @@ data:
     port: 5432
     db: postgres
     sslmode: disable
-  # resultBackendConnection defaults to the same database as metadataConnection
   resultBackendConnection: ~
   # or, you can use a different database
   # resultBackendConnection:
@@ -714,8 +726,8 @@ workers:
         path: /opt/airflow/dags
 
   extraVolumeMounts:
-    - name: dags
-      mountPath: /opt/airflow/dags
+    - name: workers
+      mountPath: /opt/airflow/workers
 
   # Select certain nodes for airflow worker pods.
   nodeSelector: {}
@@ -922,8 +934,14 @@ scheduler:
   #     - name: my-templated-extra-volume
   #       mountPath: "{{ .Values.my_custom_path }}"
   #       readOnly: true
-  extraVolumes: []
-  extraVolumeMounts: []
+  extraVolumes:
+    - name: dags
+      hostPath:
+        path: /opt/airflow/dags
+
+  extraVolumeMounts:
+    - name: dags
+      mountPath: /opt/airflow/dags
 
   # Select certain nodes for airflow scheduler pods.
   nodeSelector: {}
@@ -1289,6 +1307,7 @@ webserver:
   enabled: true
   # Add custom annotations to the webserver configmap
   configMapAnnotations: {}
+  configMapAnnotations: {}
   #  hostAliases for the webserver pod
   hostAliases: []
   #  - ip: "127.0.0.1"
@@ -1417,14 +1436,20 @@ webserver:
   #     - name: my-templated-extra-volume
   #       mountPath: "{{ .Values.my_custom_path }}"
   #       readOnly: true
-  extraVolumes: []
-  extraVolumeMounts: []
+  extraVolumes:
+    - name: dags
+      hostPath:
+        path: /opt/airflow/dags
+
+  extraVolumeMounts:
+    - name: dags
+      mountPath: /opt/airflow/dags
 
   # This string (can be templated) will be mounted into the Airflow Webserver
   # as a custom webserver_config.py. You can bake a webserver_config.py in to
   # your image instead or specify a configmap containing the
   # webserver_config.py.
-  webserverConfig: ~
+  webserverConfig:
   # webserverConfig: |
   #   from airflow import configuration as conf
 
@@ -1666,43 +1691,6 @@ triggerer:
 
   env: []
 
-  # Allow KEDA autoscaling.
-  keda:
-    enabled: false
-    namespaceLabels: {}
-
-    # How often KEDA polls the airflow DB to report new scale requests to the HPA
-    pollingInterval: 5
-
-    # How many seconds KEDA will wait before scaling to zero.
-    # Note that HPA has a separate cooldown period for scale-downs
-    cooldownPeriod: 30
-
-    # Minimum number of triggerers created by keda
-    minReplicaCount: 0
-
-    # Maximum number of triggerers created by keda
-    maxReplicaCount: 10
-
-    # Specify HPA related options
-    advanced: {}
-    # horizontalPodAutoscalerConfig:
-    #   behavior:
-    #     scaleDown:
-    #       stabilizationWindowSeconds: 300
-    #       policies:
-    #         - type: Percent
-    #           value: 100
-    #           periodSeconds: 15
-
-    # Query to use for KEDA autoscaling. Must return a single integer.
-    query: >-
-      SELECT ceil(COUNT(*)::decimal / {{ .Values.config.triggerer.default_capacity }})
-      FROM trigger
-
-    # Whether to use PGBouncer to connect to the database or not when it is enabled
-    # This configuration will be ignored if PGBouncer is not enabled
-    usePgbouncer: false
 
 # Airflow Dag Processor Config
 dagProcessor:
@@ -1850,7 +1838,7 @@ dagProcessor:
 flower:
   # Enable flower.
   # If True, and using CeleryExecutor/CeleryKubernetesExecutor, will deploy flower app.
-  enabled: false
+  enabled: true
 
   livenessProbe:
     initialDelaySeconds: 10
@@ -1935,14 +1923,14 @@ flower:
     type: ClusterIP
     ## service annotations
     annotations: {}
+    #ports:
+    #  - name: flower-ui
+    #    port: "{{ .Values.ports.flowerUI }}"
+    # To change the port used to access flower:
     ports:
       - name: flower-ui
-        port: "{{ .Values.ports.flowerUI }}"
-    # To change the port used to access flower:
-    # ports:
-    #   - name: flower-ui
-    #     port: 8080
-    #     targetPort: flower-ui
+        port: 8080
+        targetPort: flower-ui
     loadBalancerIP: ~
     ## Limit load balancer source ips to list of CIDRs
     # loadBalancerSourceRanges:
@@ -1981,282 +1969,6 @@ flower:
 
   # Labels specific to flower objects and pods
   labels: {}
-  env: []
-
-# StatsD settings
-statsd:
-  # Add custom annotations to the statsd configmap
-  configMapAnnotations: {}
-
-  enabled: true
-  # Max number of old replicasets to retain
-  revisionHistoryLimit: ~
-
-  # Arguments for StatsD exporter command.
-  args: ["--statsd.mapping-config=/etc/statsd-exporter/mappings.yml"]
-
-  # Annotations to add to the StatsD Deployment.
-  annotations: {}
-
-  # Create ServiceAccount
-  serviceAccount:
-    # default value is true
-    # ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
-    automountServiceAccountToken: true
-    # Specifies whether a ServiceAccount should be created
-    create: true
-    # The name of the ServiceAccount to use.
-    # If not set and create is true, a name is generated using the release name
-    name: ~
-
-    # Annotations to add to worker kubernetes service account.
-    annotations: {}
-
-  uid: 65534
-  # When not set, `statsd.uid` will be used
-
-  # (deprecated, use `securityContexts` instead)
-  securityContext: {}
-  #  runAsUser: 65534
-  #  fsGroup: 0
-  #  runAsGroup: 0
-
-  # Detailed default security context for statsd deployments for container and pod level
-  securityContexts:
-    pod: {}
-    container: {}
-
-  # container level lifecycle hooks
-  containerLifecycleHooks: {}
-
-  # Additional network policies as needed
-  extraNetworkPolicies: []
-  resources: {}
-  #   limits:
-  #     cpu: 100m
-  #     memory: 128Mi
-  #   requests:
-  #     cpu: 100m
-  #     memory: 128Mi
-
-  service:
-    extraAnnotations: {}
-
-  # Select certain nodes for StatsD pods.
-  nodeSelector: {}
-  affinity: {}
-  tolerations: []
-  topologySpreadConstraints: []
-
-  priorityClassName: ~
-
-  # Additional mappings for StatsD exporter.
-  # If set, will merge default mapping and extra mappings, default mapping has higher priority.
-  # So, if you want to change some default mapping, please use `overrideMappings`
-  extraMappings: []
-
-  # Override mappings for StatsD exporter.
-  # If set, will ignore setting item in default and `extraMappings`.
-  # So, If you use it, ensure all mapping item contains in it.
-  overrideMappings: []
-
-  podAnnotations: {}
-  env: []
-
-# PgBouncer settings
-pgbouncer:
-  # Enable PgBouncer
-  enabled: false
-  # Number of PgBouncer replicas to run in Deployment
-  replicas: 1
-  # Max number of old replicasets to retain
-  revisionHistoryLimit: ~
-  # Command to use for PgBouncer(templated).
-  command: ["pgbouncer", "-u", "nobody", "/etc/pgbouncer/pgbouncer.ini"]
-  # Args to use for PgBouncer(templated).
-  args: ~
-  auth_type: scram-sha-256
-  auth_file: /etc/pgbouncer/users.txt
-
-  # annotations to be added to the PgBouncer deployment
-  annotations: {}
-
-  podAnnotations: {}
-
-  # Create ServiceAccount
-  serviceAccount:
-    # default value is true
-    # ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
-    automountServiceAccountToken: true
-    # Specifies whether a ServiceAccount should be created
-    create: true
-    # The name of the ServiceAccount to use.
-    # If not set and create is true, a name is generated using the release name
-    name: ~
-
-    # Annotations to add to worker kubernetes service account.
-    annotations: {}
-
-  # Additional network policies as needed
-  extraNetworkPolicies: []
-
-  # Pool sizes
-  metadataPoolSize: 10
-  resultBackendPoolSize: 5
-
-  # Maximum clients that can connect to PgBouncer (higher = more file descriptors)
-  maxClientConn: 100
-
-  # supply the name of existing secret with pgbouncer.ini and users.txt defined
-  # you can load them to a k8s secret like the one below
-  #  apiVersion: v1
-  #  kind: Secret
-  #  metadata:
-  #    name: pgbouncer-config-secret
-  #  data:
-  #     pgbouncer.ini: <base64_encoded pgbouncer.ini file content>
-  #     users.txt: <base64_encoded users.txt file content>
-  #  type: Opaque
-  #
-  #  configSecretName: pgbouncer-config-secret
-  #
-  configSecretName: ~
-
-  # PgBouncer pod disruption budget
-  podDisruptionBudget:
-    enabled: false
-
-    # PDB configuration
-    config:
-      # minAvailable and maxUnavailable are mutually exclusive
-      maxUnavailable: 1
-      # minAvailable: 1
-
-  # Limit the resources to PgBouncer.
-  # When you specify the resource request the k8s scheduler uses this information to decide which node to
-  # place the Pod on. When you specify a resource limit for a Container, the kubelet enforces those limits so
-  # that the running container is not allowed to use more of that resource than the limit you set.
-  # See: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
-  # Example:
-  #
-  # resource:
-  #   limits:
-  #     cpu: 100m
-  #     memory: 128Mi
-  #   requests:
-  #     cpu: 100m
-  #     memory: 128Mi
-  resources: {}
-
-  service:
-    extraAnnotations: {}
-
-  # https://www.pgbouncer.org/config.html
-  verbose: 0
-  logDisconnections: 0
-  logConnections: 0
-
-  sslmode: "prefer"
-  ciphers: "normal"
-
-  ssl:
-    ca: ~
-    cert: ~
-    key: ~
-
-  # Add extra PgBouncer ini configuration in the databases section:
-  # https://www.pgbouncer.org/config.html#section-databases
-  extraIniMetadata: ~
-  extraIniResultBackend: ~
-  # Add extra general PgBouncer ini configuration: https://www.pgbouncer.org/config.html
-  extraIni: ~
-
-  # Mount additional volumes into pgbouncer. It can be templated like in the following example:
-  #   extraVolumes:
-  #     - name: my-templated-extra-volume
-  #       secret:
-  #          secretName: '{{ include "my_secret_template" . }}'
-  #          defaultMode: 0640
-  #          optional: true
-  #
-  #   extraVolumeMounts:
-  #     - name: my-templated-extra-volume
-  #       mountPath: "{{ .Values.my_custom_path }}"
-  #       readOnly: true
-  extraVolumes: []
-  extraVolumeMounts: []
-
-  # Launch additional containers into pgbouncer.
-  extraContainers: []
-
-  # Select certain nodes for PgBouncer pods.
-  nodeSelector: {}
-  affinity: {}
-  tolerations: []
-  topologySpreadConstraints: []
-
-  priorityClassName: ~
-
-  uid: 65534
-
-  # Detailed default security context for pgbouncer for container level
-  securityContexts:
-    pod: {}
-    container: {}
-
-  # container level lifecycle hooks
-  containerLifecycleHooks:
-    preStop:
-      exec:
-        # Allow existing queries clients to complete within 120 seconds
-        command: ["/bin/sh", "-c", "killall -INT pgbouncer && sleep 120"]
-
-  metricsExporterSidecar:
-    resources: {}
-    #  limits:
-    #   cpu: 100m
-    #   memory: 128Mi
-    #  requests:
-    #   cpu: 100m
-    #   memory: 128Mi
-    sslmode: "disable"
-
-    # supply the name of existing secret with PGBouncer connection URI containing
-    # stats user and password.
-    # you can load them to a k8s secret like the one below
-    #  apiVersion: v1
-    #  kind: Secret
-    #  metadata:
-    #    name: pgbouncer-stats-secret
-    #  data:
-    #     connection: postgresql://<stats user>:<password>@127.0.0.1:6543/pgbouncer?<connection params>
-    #  type: Opaque
-    #
-    #  statsSecretName: pgbouncer-stats-secret
-    #
-    statsSecretName: ~
-
-    # Key containing the PGBouncer connection URI, defaults to `connection` if not defined
-    statsSecretKey: ~
-
-    # Detailed default security context for metricsExporterSidecar for container level
-    securityContexts:
-      container: {}
-
-    # container level lifecycle hooks
-    containerLifecycleHooks: {}
-
-    livenessProbe:
-      initialDelaySeconds: 10
-      periodSeconds: 10
-      timeoutSeconds: 1
-
-    readinessProbe:
-      initialDelaySeconds: 10
-      periodSeconds: 10
-      timeoutSeconds: 1
-
-  # Environment variables to add to pgbouncer container
   env: []
 
 # Configuration for the redis provisioned by the chart
@@ -2339,34 +2051,7 @@ redis:
   containerLifecycleHooks: {}
 
   podAnnotations: {}
-# Auth secret for a private registry
-# This is used if pulling airflow images from a private registry
-registry:
-  secretName: ~
 
-  # Example:
-  # connection:
-  #   user: ~
-  #   pass: ~
-  #   host: ~
-  #   email: ~
-  connection: {}
-
-# Elasticsearch logging configuration
-elasticsearch:
-  # Enable elasticsearch task logging
-  enabled: false
-  # A secret containing the connection
-  secretName: ~
-  # Or an object representing the connection
-  # Example:
-  # connection:
-  #   scheme: ~
-  #   user: ~
-  #   pass: ~
-  #   host: ~
-  #   port: ~
-  connection: {}
 
 # All ports used by chart
 ports:
@@ -2387,77 +2072,6 @@ quotas: {}
 
 # Define default/max/min values for pods and containers in namespace
 limits: []
-
-# This runs as a CronJob to cleanup old pods.
-cleanup:
-  enabled: false
-  # Run every 15 minutes (templated).
-  schedule: "*/15 * * * *"
-  # To select a random-ish, deterministic starting minute between 3 and 12 inclusive for each release:
-  #     '{{- add 3 (regexFind ".$" (adler32sum .Release.Name)) -}}-59/15 * * * *'
-  # To select the last digit of unix epoch time as the starting minute on each deploy:
-  #     '{{- now | unixEpoch | trunc -1 -}}-59/* * * * *'
-
-  # Command to use when running the cleanup cronjob (templated).
-  command: ~
-  # Args to use when running the cleanup cronjob (templated).
-  args: ["bash", "-c", "exec airflow kubernetes cleanup-pods --namespace={{ .Release.Namespace }}"]
-
-  # jobAnnotations are annotations on the cleanup CronJob
-  jobAnnotations: {}
-
-  # Select certain nodes for airflow cleanup pods.
-  nodeSelector: {}
-  affinity: {}
-  tolerations: []
-  topologySpreadConstraints: []
-  priorityClassName: ~
-
-  podAnnotations: {}
-
-  # Labels specific to cleanup objects and pods
-  labels: {}
-
-  resources: {}
-  #  limits:
-  #   cpu: 100m
-  #   memory: 128Mi
-  #  requests:
-  #   cpu: 100m
-  #   memory: 128Mi
-
-  # Create ServiceAccount
-  serviceAccount:
-    # default value is true
-    # ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
-    automountServiceAccountToken: true
-    # Specifies whether a ServiceAccount should be created
-    create: true
-    # The name of the ServiceAccount to use.
-    # If not set and create is true, a name is generated using the release name
-    name: ~
-
-    # Annotations to add to cleanup cronjob kubernetes service account.
-    annotations: {}
-
-  # When not set, the values defined in the global securityContext will be used
-  securityContext: {}
-  #  runAsUser: 50000
-  #  runAsGroup: 0
-  env: []
-
-  # Detailed default security context for cleanup for container level
-  securityContexts:
-    pod: {}
-    container: {}
-
-  # container level lifecycle hooks
-  containerLifecycleHooks: {}
-
-  # Specify history limit
-  # When set, overwrite the default k8s number of successful and failed CronJob executions that are saved.
-  failedJobsHistoryLimit: ~
-  successfulJobsHistoryLimit: ~
 
 # Configuration for postgresql subchart
 # Not recommended for production
@@ -2481,6 +2095,7 @@ postgresql:
 # yamllint disable rule:line-length
 config:
   core:
+    default_timezone: "Asia/Seoul"  # 경준 추가
     dags_folder: '{{ include "airflow_dags" . }}'
     # This is ignored when used with the official Docker image
     load_examples: 'False'
@@ -2491,91 +2106,6 @@ config:
   logging:
     remote_logging: '{{- ternary "True" "False" .Values.elasticsearch.enabled }}'
     colored_console_log: 'False'
-  metrics:
-    statsd_on: '{{ ternary "True" "False" .Values.statsd.enabled }}'
-    statsd_port: 9125
-    statsd_prefix: airflow
-    statsd_host: '{{ printf "%s-statsd" (include "airflow.fullname" .) }}'
-  webserver:
-    enable_proxy_fix: 'True'
-    # For Airflow 1.10
-    rbac: 'True'
-  celery:
-    flower_url_prefix: '{{ ternary "" .Values.ingress.flower.path (eq .Values.ingress.flower.path "/") }}'
-    worker_concurrency: 16
-  scheduler:
-    standalone_dag_processor: '{{ ternary "True" "False" .Values.dagProcessor.enabled }}'
-    # statsd params included for Airflow 1.10 backward compatibility; moved to [metrics] in 2.0
-    statsd_on: '{{ ternary "True" "False" .Values.statsd.enabled }}'
-    statsd_port: 9125
-    statsd_prefix: airflow
-    statsd_host: '{{ printf "%s-statsd" (include "airflow.fullname" .) }}'
-    # `run_duration` included for Airflow 1.10 backward compatibility; removed in 2.0.
-    run_duration: 41460
-  elasticsearch:
-    json_format: 'True'
-    log_id_template: "{dag_id}_{task_id}_{execution_date}_{try_number}"
-  elasticsearch_configs:
-    max_retries: 3
-    timeout: 30
-    retry_timeout: 'True'
-  kerberos:
-    keytab: '{{ .Values.kerberos.keytabPath }}'
-    reinit_frequency: '{{ .Values.kerberos.reinitFrequency }}'
-    principal: '{{ .Values.kerberos.principal }}'
-    ccache: '{{ .Values.kerberos.ccacheMountPath }}/{{ .Values.kerberos.ccacheFileName }}'
-  celery_kubernetes_executor:
-    kubernetes_queue: 'kubernetes'
-  # The `kubernetes` section is deprecated in Airflow >= 2.5.0 due to an airflow.cfg schema change.
-  # The `kubernetes` section can be removed once the helm chart no longer supports Airflow < 2.5.0.
-  kubernetes:
-    namespace: '{{ .Release.Namespace }}'
-    # The following `airflow_` entries are for Airflow 1, and can be removed when it is no longer supported.
-    airflow_configmap: '{{ include "airflow_config" . }}'
-    airflow_local_settings_configmap: '{{ include "airflow_config" . }}'
-    pod_template_file: '{{ include "airflow_pod_template_file" . }}/pod_template_file.yaml'
-    worker_container_repository: '{{ .Values.images.airflow.repository | default .Values.defaultAirflowRepository }}'
-    worker_container_tag: '{{ .Values.images.airflow.tag | default .Values.defaultAirflowTag }}'
-    multi_namespace_mode: '{{ ternary "True" "False" .Values.multiNamespaceMode }}'
-  # The `kubernetes_executor` section duplicates the `kubernetes` section in Airflow >= 2.5.0 due to an airflow.cfg schema change.
-  kubernetes_executor:
-    namespace: '{{ .Release.Namespace }}'
-    pod_template_file: '{{ include "airflow_pod_template_file" . }}/pod_template_file.yaml'
-    worker_container_repository: '{{ .Values.images.airflow.repository | default .Values.defaultAirflowRepository }}'
-    worker_container_tag: '{{ .Values.images.airflow.tag | default .Values.defaultAirflowTag }}'
-    multi_namespace_mode: '{{ ternary "True" "False" .Values.multiNamespaceMode }}'
-  triggerer:
-    default_capacity: 1000
-# yamllint enable rule:line-length
-
-# Whether Airflow can launch workers and/or pods in multiple namespaces
-# If true, it creates ClusterRole/ClusterRolebinding (with access to entire cluster)
-multiNamespaceMode: false
-
-# `podTemplate` is a templated string containing the contents of `pod_template_file.yaml` used for
-# KubernetesExecutor workers. The default `podTemplate` will use normal `workers` configuration parameters
-# (e.g. `workers.resources`). As such, you normally won't need to override this directly, however,
-# you can still provide a completely custom `pod_template_file.yaml` if desired.
-# If not set, a default one is created using `files/pod-template-file.kubernetes-helm-yaml`.
-podTemplate: ~
-# The following example is NOT functional, but meant to be illustrative of how you can provide a custom
-# `pod_template_file`. You're better off starting with the default in
-# `files/pod-template-file.kubernetes-helm-yaml` and modifying from there.
-# We will set `priorityClassName` in this example:
-# podTemplate: |
-#   apiVersion: v1
-#   kind: Pod
-#   metadata:
-#     name: placeholder-name
-#     labels:
-#       tier: airflow
-#       component: worker
-#       release: {{ .Release.Name }}
-#   spec:
-#     priorityClassName: high-priority
-#     containers:
-#       - name: base
-#         ...
 
 # Git sync
 dags:
@@ -2716,15 +2246,16 @@ logs:
   #   sizeLimit: 1Gi
   #   medium: Memory
 
+  # 경준 추가(25.02.18)
   persistence:
     # Enable persistent volume for storing logs
-    enabled: false
+    enabled: true
     # Volume size for logs
-    size: 100Gi
+    size: 10Gi
     # Annotations for the logs PVC
     annotations: {}
     # If using a custom storageClass, pass name here
     storageClassName:
     ## the name of an existing PVC to use
-    existingClaim:
+    existingClaim: airflow-log-pvc
 

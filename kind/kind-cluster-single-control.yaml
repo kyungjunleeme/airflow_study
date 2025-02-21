@@ -1,0 +1,35 @@
+apiVersion: kind.x-k8s.io/v1alpha4
+kind: Cluster
+#featureGates:
+#  "InPlacePodVerticalScaling": true  # 실행 중인 파드의 리소스 요청 및 제한을 변경할 수 있게 합니다.
+#  "MultiCIDRServiceAllocator": true  # 서비스에 대해 여러 CIDR 블록을 사용할 수 있게 합니다.
+nodes:
+  - role: control-plane
+    labels:
+      mynode: control-plane
+#      topology.kubernetes.io/zone: ap-northeast-2a
+    extraPortMappings:  # 컨테이너 포트를 호스트 포트에 매핑하여 클러스터 외부에서 서비스에 접근할 수 있도록 합니다.
+      - containerPort: 8080  # webserver
+        hostPort: 8080
+      - containerPort: 5432  # postgres
+        hostPort: 5432
+      - containerPort: 30032  # grafana
+        hostPort: 30032
+      - containerPort: 30000
+        hostPort: 30000
+      - containerPort: 30001  # prometheus
+        hostPort: 30001
+      - containerPort: 30002  # grafana
+        hostPort: 30002
+
+    extraMounts:
+      - hostPath: dags
+        containerPath: /opt/airflow/dags
+      - hostPath:
+
+#      - hostPath: logs
+#        containerPath: /var/local-path-provisioner  # local-path-config 에서 정보 얻음
+
+#networking:
+#  podSubnet: 10.10.0.0/16  #파드 IP를 위한 CIDR 범위를 정의합니다. 파드는 이 범위에서 IP를 할당받습니다.
+#  serviceSubnet: 10.200.1.0/24  #서비스 IP를 위한 CIDR 범위를 정의합니다. 서비스는 이 범위에서 IP를 할당받습니다.

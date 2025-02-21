@@ -1,0 +1,21 @@
+prometheus:
+  service:
+    type: NodePort
+    nodePort: 30001
+
+  prometheusSpec:
+    podMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelectorNilUsesHelmValues: false
+
+grafana:
+  defaultDashboardsTimezone: Asia/Seoul
+  adminPassword: qwer12345
+
+  service:
+    type: NodePort
+    nodePort: 30002
+
+defaultRules:
+  create: false
+alertmanager:
+  enabled: false
