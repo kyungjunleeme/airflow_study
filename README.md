@@ -1,7 +1,6 @@
 airflow ETL
 https://www.youtube.com/watch?v=Y_vQyMljDsE
 
-
 kind 에서 -> Pvc 만 연결시켜줫는데 -> 어떻게 Pv 가 생겨
 
 플러그인 폴더는 따로 사용안하는것 같았는데
@@ -171,3 +170,6 @@ GRANT
 
 
 
+uv 방법 정리 -> 가상환경 -> lock 파일 생성하는 법 찾아야함
+- https://github.com/astral-sh/uv/issues/3876
+- uv venv --seed
