@@ -1,3 +1,8 @@
+uv 가상환경 별 lock 파일 만들기
+
+- https://github.com/astral-sh/uv/issues/9150
+
+
 airflow ETL
 https://www.youtube.com/watch?v=Y_vQyMljDsE
 
