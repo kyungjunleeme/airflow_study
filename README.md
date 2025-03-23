@@ -1,5 +1,6 @@
 airflow 기술 블로그 정리
 - https://blog.nftbank.ai/nftbank%EC%97%90%EC%84%9C-airflow-%EB%8D%B0%EC%9D%B4%ED%84%B0-%ED%8C%8C%EC%9D%B4%ED%94%84%EB%9D%BC%EC%9D%B8%EC%9D%84-%EC%95%88%EC%A0%84%ED%95%98%EA%B2%8C-%EB%B9%A0%EB%A5%B4%EA%B2%8C-%EA%B0%9C%EB%B0%9C%EA%B3%BC-%ED%85%8C%EC%8A%A4%ED%8A%B8%EB%A5%BC-%ED%95%A0-%EC%88%98-%EC%9E%88%EB%8A%94-%EC%9D%B4%EC%9C%A0-653aa18b683e
+- 무신사 블로그 보기 (구본협님)
 
 
 
